@@ -318,7 +318,7 @@ const Navbar: React.FC = () => {
             {/* Right Section */}
             <div className="flex items-center space-x-3">
               {/* Search (Desktop) */}
-              <div className="hidden xl:block">
+              {/* <div className="hidden xl:block">
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                     <Search className="h-4 w-4 text-gray-400" />
@@ -329,7 +329,7 @@ const Navbar: React.FC = () => {
                     className="block w-64 pl-10 pr-3 py-2 border border-gray-200 rounded-xl text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50/50 hover:bg-white transition-colors duration-200"
                   />
                 </div>
-              </div>
+              </div>  */}
 
               {/* Notifications */}
               <div className="relative">
