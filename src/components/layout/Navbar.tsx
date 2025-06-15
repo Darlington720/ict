@@ -214,14 +214,14 @@ const Navbar: React.FC = () => {
 
               {/* Quick Stats (Desktop) */}
               <div className="hidden xl:flex items-center space-x-4 ml-8 pl-8 border-l border-gray-200">
-                <div className="flex items-center space-x-2 px-3 py-1.5 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-full">
+                {/* <div className="flex items-center space-x-2 px-3 py-1.5 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-full">
                   <Activity className="h-4 w-4 text-blue-600" />
                   <span className="text-sm font-medium text-blue-700">Live</span>
                 </div>
                 <div className="flex items-center space-x-2 px-3 py-1.5 bg-gradient-to-r from-green-50 to-emerald-50 rounded-full">
                   <TrendingUp className="h-4 w-4 text-green-600" />
                   <span className="text-sm font-medium text-green-700">500+ Schools</span>
-                </div>
+                </div> */}
               </div>
             </div>
 
