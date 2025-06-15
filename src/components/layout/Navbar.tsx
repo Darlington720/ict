@@ -22,7 +22,18 @@ import {
   Shield,
   Globe,
   TrendingUp,
-  Activity
+  Activity,
+  Database,
+  PieChart,
+  MapPin,
+  UserCheck,
+  BookOpen,
+  Monitor,
+  Wifi,
+  Battery,
+  Target,
+  Eye,
+  Plus
 } from 'lucide-react';
 
 const Navbar: React.FC = () => {
@@ -31,6 +42,7 @@ const Navbar: React.FC = () => {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
   const [scrolled, setScrolled] = useState(false);
 
   if (!user) return null;
@@ -47,50 +59,96 @@ const Navbar: React.FC = () => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  // Main navigation structure with submenus
   const navigation = [
     {
       name: 'Dashboard',
       href: '/',
       icon: LayoutDashboard,
       show: true,
-      description: 'Overview & Analytics'
+      description: 'System Overview'
     },
     {
       name: 'Schools',
-      href: '/schools',
       icon: School,
       show: permissions.canViewAllSchools || !!permissions.restrictedToSchool,
-      description: 'School Management'
+      description: 'School Management',
+      submenu: [
+        {
+          name: 'All Schools',
+          href: '/schools',
+          icon: School,
+          description: 'View and manage schools',
+          show: permissions.canViewAllSchools
+        },
+        {
+          name: 'My School',
+          href: `/schools/${permissions.restrictedToSchool}`,
+          icon: School,
+          description: 'View your school details',
+          show: !!permissions.restrictedToSchool
+        },
+        {
+          name: 'Add School',
+          href: '/schools/add',
+          icon: Plus,
+          description: 'Register new school',
+          show: permissions.canEditAllSchools
+        }
+      ].filter(item => item.show)
     },
     {
-      name: 'ICT Reports',
-      href: '/reports',
-      icon: FileText,
-      show: permissions.canViewAllReports || !!permissions.restrictedToSchool,
-      description: 'Periodic Observations'
+      name: 'Analytics',
+      icon: BarChart3,
+      show: permissions.canViewAnalytics,
+      description: 'Data Analysis & Insights',
+      submenu: [
+        {
+          name: 'Reports',
+          href: '/reports',
+          icon: FileText,
+          description: 'Periodic observations',
+          show: permissions.canViewAllReports || !!permissions.restrictedToSchool
+        },
+        {
+          name: 'Compare Schools',
+          href: '/compare',
+          icon: TrendingUp,
+          description: 'School comparison',
+          show: permissions.canViewAllSchools
+        },
+        {
+          name: 'Geographic View',
+          href: '/map',
+          icon: MapPin,
+          description: 'Interactive map',
+          show: permissions.canViewAllSchools
+        }
+      ].filter(item => item.show)
     },
     {
-      name: 'Compare',
-      href: '/compare',
-      icon: Users,
-      show: permissions.canViewAllSchools,
-      description: 'School Comparison'
-    },
-    {
-      name: 'Map View',
-      href: '/map',
-      icon: Map,
-      show: permissions.canViewAllSchools,
-      description: 'Geographic View'
-    },
-    {
-      name: 'Users',
-      href: '/users',
+      name: 'Administration',
       icon: Settings,
       show: permissions.canManageUsers,
-      description: 'User Management'
+      description: 'System Administration',
+      submenu: [
+        {
+          name: 'User Management',
+          href: '/users',
+          icon: UserCheck,
+          description: 'Manage system users',
+          show: permissions.canManageUsers
+        },
+        {
+          name: 'System Settings',
+          href: '/settings',
+          icon: Settings,
+          description: 'Configure system',
+          show: permissions.canManageUsers
+        }
+      ].filter(item => item.show)
     }
-  ].filter(item => item.show);
+  ].filter(item => item.show && (item.submenu ? item.submenu.length > 0 : true));
 
   const handleLogout = () => {
     logout();
@@ -102,6 +160,10 @@ const Navbar: React.FC = () => {
       return location.pathname === '/';
     }
     return location.pathname.startsWith(href);
+  };
+
+  const isDropdownActive = (submenu: any[]) => {
+    return submenu.some(item => isActive(item.href));
   };
 
   const getRoleColor = (role: string) => {
@@ -151,7 +213,7 @@ const Navbar: React.FC = () => {
               </Link>
 
               {/* Quick Stats (Desktop) */}
-              <div className="hidden lg:flex items-center space-x-4 ml-8 pl-8 border-l border-gray-200">
+              <div className="hidden xl:flex items-center space-x-4 ml-8 pl-8 border-l border-gray-200">
                 <div className="flex items-center space-x-2 px-3 py-1.5 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-full">
                   <Activity className="h-4 w-4 text-blue-600" />
                   <span className="text-sm font-medium text-blue-700">Live</span>
@@ -164,43 +226,99 @@ const Navbar: React.FC = () => {
             </div>
 
             {/* Desktop Navigation */}
-            <nav className="hidden md:flex items-center space-x-1">
+            <nav className="hidden lg:flex items-center space-x-1">
               {navigation.map((item) => {
                 const IconComponent = item.icon;
-                const active = isActive(item.href);
-                return (
-                  <Link
-                    key={item.name}
-                    to={item.href}
-                    className={`group relative flex items-center px-4 py-2 text-sm font-medium rounded-xl transition-all duration-200 ${
-                      active
-                        ? 'text-blue-600 bg-blue-50 shadow-sm'
-                        : 'text-gray-700 hover:text-blue-600 hover:bg-gray-50'
-                    }`}
-                  >
-                    <IconComponent className={`h-4 w-4 mr-2 transition-transform duration-200 ${
-                      active ? 'scale-110' : 'group-hover:scale-105'
-                    }`} />
-                    <span>{item.name}</span>
-                    
-                    {/* Active indicator */}
-                    {active && (
-                      <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-1 h-1 bg-blue-600 rounded-full"></div>
-                    )}
-                    
-                    {/* Hover tooltip */}
-                    <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
-                      {item.description}
+                const hasSubmenu = item.submenu && item.submenu.length > 0;
+                const active = hasSubmenu ? isDropdownActive(item.submenu!) : isActive(item.href!);
+                const isOpen = activeDropdown === item.name;
+
+                if (hasSubmenu) {
+                  return (
+                    <div key={item.name} className="relative">
+                      <button
+                        onClick={() => setActiveDropdown(isOpen ? null : item.name)}
+                        className={`group relative flex items-center px-4 py-2 text-sm font-medium rounded-xl transition-all duration-200 ${
+                          active || isOpen
+                            ? 'text-blue-600 bg-blue-50 shadow-sm'
+                            : 'text-gray-700 hover:text-blue-600 hover:bg-gray-50'
+                        }`}
+                      >
+                        <IconComponent className={`h-4 w-4 mr-2 transition-transform duration-200 ${
+                          active || isOpen ? 'scale-110' : 'group-hover:scale-105'
+                        }`} />
+                        <span>{item.name}</span>
+                        <ChevronDown className={`h-4 w-4 ml-1 transition-transform duration-200 ${
+                          isOpen ? 'rotate-180' : ''
+                        }`} />
+                        
+                        {/* Active indicator */}
+                        {active && (
+                          <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-1 h-1 bg-blue-600 rounded-full"></div>
+                        )}
+                      </button>
+
+                      {/* Dropdown Menu */}
+                      {isOpen && (
+                        <div className="absolute top-full left-0 mt-2 w-64 bg-white rounded-xl shadow-lg border border-gray-200 py-2 z-50">
+                          <div className="px-4 py-2 border-b border-gray-100">
+                            <h3 className="text-sm font-medium text-gray-900">{item.name}</h3>
+                            <p className="text-xs text-gray-500">{item.description}</p>
+                          </div>
+                          {item.submenu!.map((subItem) => {
+                            const SubIconComponent = subItem.icon;
+                            const subActive = isActive(subItem.href);
+                            return (
+                              <Link
+                                key={subItem.name}
+                                to={subItem.href}
+                                onClick={() => setActiveDropdown(null)}
+                                className={`flex items-center px-4 py-3 text-sm hover:bg-gray-50 transition-colors duration-150 ${
+                                  subActive ? 'text-blue-600 bg-blue-50 border-r-2 border-blue-600' : 'text-gray-700'
+                                }`}
+                              >
+                                <SubIconComponent className="h-4 w-4 mr-3 text-gray-400" />
+                                <div>
+                                  <div className="font-medium">{subItem.name}</div>
+                                  <div className="text-xs text-gray-500">{subItem.description}</div>
+                                </div>
+                              </Link>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
-                  </Link>
-                );
+                  );
+                } else {
+                  return (
+                    <Link
+                      key={item.name}
+                      to={item.href!}
+                      className={`group relative flex items-center px-4 py-2 text-sm font-medium rounded-xl transition-all duration-200 ${
+                        active
+                          ? 'text-blue-600 bg-blue-50 shadow-sm'
+                          : 'text-gray-700 hover:text-blue-600 hover:bg-gray-50'
+                      }`}
+                    >
+                      <IconComponent className={`h-4 w-4 mr-2 transition-transform duration-200 ${
+                        active ? 'scale-110' : 'group-hover:scale-105'
+                      }`} />
+                      <span>{item.name}</span>
+                      
+                      {/* Active indicator */}
+                      {active && (
+                        <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-1 h-1 bg-blue-600 rounded-full"></div>
+                      )}
+                    </Link>
+                  );
+                }
               })}
             </nav>
 
             {/* Right Section */}
             <div className="flex items-center space-x-3">
               {/* Search (Desktop) */}
-              <div className="hidden lg:block">
+              <div className="hidden xl:block">
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                     <Search className="h-4 w-4 text-gray-400" />
@@ -353,7 +471,7 @@ const Navbar: React.FC = () => {
               {/* Mobile Menu Button */}
               <button
                 onClick={() => setShowMobileMenu(!showMobileMenu)}
-                className="md:hidden inline-flex items-center justify-center p-2 rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200"
+                className="lg:hidden inline-flex items-center justify-center p-2 rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200"
               >
                 {showMobileMenu ? (
                   <X className="h-6 w-6" />
@@ -366,29 +484,87 @@ const Navbar: React.FC = () => {
 
           {/* Mobile Navigation */}
           {showMobileMenu && (
-            <div className="md:hidden border-t border-gray-200 py-4 bg-white/95 backdrop-blur-sm">
+            <div className="lg:hidden border-t border-gray-200 py-4 bg-white/95 backdrop-blur-sm">
               <div className="space-y-2">
                 {navigation.map((item) => {
                   const IconComponent = item.icon;
-                  const active = isActive(item.href);
-                  return (
-                    <Link
-                      key={item.name}
-                      to={item.href}
-                      onClick={() => setShowMobileMenu(false)}
-                      className={`flex items-center px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200 ${
-                        active
-                          ? 'text-blue-600 bg-blue-50 border-l-4 border-blue-600'
-                          : 'text-gray-700 hover:text-blue-600 hover:bg-gray-50'
-                      }`}
-                    >
-                      <IconComponent className="h-5 w-5 mr-3" />
-                      <div>
-                        <div>{item.name}</div>
-                        <div className="text-xs text-gray-500">{item.description}</div>
+                  const hasSubmenu = item.submenu && item.submenu.length > 0;
+                  const active = hasSubmenu ? isDropdownActive(item.submenu!) : isActive(item.href!);
+
+                  if (hasSubmenu) {
+                    return (
+                      <div key={item.name}>
+                        <button
+                          onClick={() => setActiveDropdown(activeDropdown === item.name ? null : item.name)}
+                          className={`flex items-center justify-between w-full px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200 ${
+                            active
+                              ? 'text-blue-600 bg-blue-50 border-l-4 border-blue-600'
+                              : 'text-gray-700 hover:text-blue-600 hover:bg-gray-50'
+                          }`}
+                        >
+                          <div className="flex items-center">
+                            <IconComponent className="h-5 w-5 mr-3" />
+                            <div>
+                              <div>{item.name}</div>
+                              <div className="text-xs text-gray-500">{item.description}</div>
+                            </div>
+                          </div>
+                          <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${
+                            activeDropdown === item.name ? 'rotate-180' : ''
+                          }`} />
+                        </button>
+                        
+                        {activeDropdown === item.name && (
+                          <div className="ml-4 mt-2 space-y-1">
+                            {item.submenu!.map((subItem) => {
+                              const SubIconComponent = subItem.icon;
+                              const subActive = isActive(subItem.href);
+                              return (
+                                <Link
+                                  key={subItem.name}
+                                  to={subItem.href}
+                                  onClick={() => {
+                                    setShowMobileMenu(false);
+                                    setActiveDropdown(null);
+                                  }}
+                                  className={`flex items-center px-4 py-2 text-sm rounded-lg transition-all duration-200 ${
+                                    subActive
+                                      ? 'text-blue-600 bg-blue-50'
+                                      : 'text-gray-600 hover:text-blue-600 hover:bg-gray-50'
+                                  }`}
+                                >
+                                  <SubIconComponent className="h-4 w-4 mr-3" />
+                                  <div>
+                                    <div className="font-medium">{subItem.name}</div>
+                                    <div className="text-xs text-gray-500">{subItem.description}</div>
+                                  </div>
+                                </Link>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
-                    </Link>
-                  );
+                    );
+                  } else {
+                    return (
+                      <Link
+                        key={item.name}
+                        to={item.href!}
+                        onClick={() => setShowMobileMenu(false)}
+                        className={`flex items-center px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200 ${
+                          active
+                            ? 'text-blue-600 bg-blue-50 border-l-4 border-blue-600'
+                            : 'text-gray-700 hover:text-blue-600 hover:bg-gray-50'
+                        }`}
+                      >
+                        <IconComponent className="h-5 w-5 mr-3" />
+                        <div>
+                          <div>{item.name}</div>
+                          <div className="text-xs text-gray-500">{item.description}</div>
+                        </div>
+                      </Link>
+                    );
+                  }
                 })}
               </div>
 
@@ -411,13 +587,14 @@ const Navbar: React.FC = () => {
       </header>
 
       {/* Click outside to close menus */}
-      {(showUserMenu || showMobileMenu || showNotifications) && (
+      {(showUserMenu || showMobileMenu || showNotifications || activeDropdown) && (
         <div
           className="fixed inset-0 z-40"
           onClick={() => {
             setShowUserMenu(false);
             setShowMobileMenu(false);
             setShowNotifications(false);
+            setActiveDropdown(null);
           }}
         />
       )}
