@@ -145,7 +145,7 @@ export const getRoleDescription = (role: UserRole): string => {
   }
 };
 
-export const canAccessResource = (
+const canAccessResource = (
   userRole: UserRole, 
   user: User, 
   resourceType: 'school' | 'report', 

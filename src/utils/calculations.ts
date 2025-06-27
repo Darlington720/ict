@@ -75,7 +75,7 @@ export const getLatestReport = (schoolId: string, reports: ICTReport[]): ICTRepo
  * @param reports Array of all ICT reports
  * @returns Array of ICT reports for the school
  */
-export const getSchoolReports = (schoolId: string, reports: ICTReport[]): ICTReport[] => {
+const getSchoolReports = (schoolId: string, reports: ICTReport[]): ICTReport[] => {
   return reports
     .filter(report => report.schoolId === schoolId)
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());

@@ -208,13 +208,13 @@ export interface ICTReport {
   };
 }
 
-export interface ICTReadinessLevel {
+interface ICTReadinessLevel {
   schoolId: string;
   level: 'Low' | 'Medium' | 'High';
   score: number;
 }
 
-export interface ComparisonData {
+interface ComparisonData {
   schools: School[];
   reports: ICTReport[];
 }
