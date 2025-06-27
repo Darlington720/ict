@@ -1,3 +1,5 @@
+import React from 'react';
+
 export interface School {
   id: string;
   name: string;
@@ -30,7 +32,7 @@ export interface School {
   };
   
   // Infrastructure
-  infrastructure: {
+  infrastructure?: {
     studentComputers: number;
     teacherComputers: number;
     projectors: number;
@@ -47,7 +49,7 @@ export interface School {
   };
   
   // Connectivity
-  internet: {
+  internet?: {
     connectionType: 'None' | 'Fiber' | 'Mobile Broadband' | 'Satellite';
     bandwidthMbps: number;
     wifiCoverage: ('Administration' | 'Classrooms' | 'Library' | 'Dormitories')[];
@@ -58,7 +60,7 @@ export interface School {
   };
   
   // Software
-  software: {
+  software?: {
     hasLMS: boolean;
     lmsName?: string;
     hasLicensedSoftware: boolean;
@@ -71,7 +73,7 @@ export interface School {
   };
   
   // Human Capacity
-  humanCapacity: {
+  humanCapacity?: {
     ictTrainedTeachers: number;
     totalTeachers: number;
     maleTeachers: number;
@@ -84,7 +86,7 @@ export interface School {
   };
   
   // Pedagogical Usage
-  pedagogicalUsage: {
+  pedagogicalUsage?: {
     ictIntegratedLessons: number;
     usesICTAssessments: boolean;
     hasStudentProjects: boolean;
@@ -96,7 +98,7 @@ export interface School {
   };
   
   // Governance
-  governance: {
+  governance?: {
     hasICTPolicy: boolean;
     alignedWithNationalStrategy: boolean;
     hasICTCommittee: boolean;
@@ -108,7 +110,7 @@ export interface School {
   };
   
   // Student Engagement
-  studentEngagement: {
+  studentEngagement?: {
     digitalLiteracyLevel: 'Basic' | 'Intermediate' | 'Advanced';
     hasICTClub: boolean;
     usesOnlinePlatforms: boolean;
@@ -117,7 +119,7 @@ export interface School {
   };
   
   // Community Engagement
-  communityEngagement: {
+  communityEngagement?: {
     hasParentPortal: boolean;
     hasCommunityOutreach: boolean;
     hasIndustryPartners: boolean;
@@ -127,7 +129,7 @@ export interface School {
   };
   
   // Security & Safety
-  security: {
+  security?: {
     isFenced: boolean;
     hasSecurityGuard: boolean;
     hasRecentIncidents: boolean;
@@ -137,7 +139,7 @@ export interface School {
   };
   
   // Accessibility
-  accessibility: {
+  accessibility?: {
     distanceFromHQ: number;
     isAccessibleAllYear: boolean;
     isInclusive: boolean;
@@ -148,7 +150,7 @@ export interface School {
   };
   
   // Environment & Facilities
-  environment: {
+  environment?: {
     permanentClassrooms: number;
     semiPermanentClassrooms: number;
     temporaryClassrooms: number;
@@ -164,7 +166,7 @@ export interface School {
   };
   
   // Performance
-  performance: {
+  performance?: {
     plePassRateYear1?: number;
     plePassRateYear2?: number;
     plePassRateYear3?: number;
@@ -173,6 +175,9 @@ export interface School {
     innovations?: string;
     uniqueAchievements?: string;
   };
+
+  // Policy Maturity (calculated)
+  policyMaturity?: SchoolPolicyMaturity;
 }
 
 export interface ICTReport {
@@ -206,6 +211,53 @@ export interface ICTReport {
     ictTrainedTeachers: number;
     supportStaff: number;
   };
+}
+
+// Policy Maturity Types
+export type ProgressStage = 'Latent' | 'Emerging' | 'Established' | 'Advanced';
+export type ICTReadinessLevel = 'Low' | 'Medium' | 'High';
+
+export interface PolicyThemeScore {
+  code: string;
+  name: string;
+  score: number; // 0-100
+  stage: ProgressStage;
+  subScores: {
+    [key: string]: {
+      name: string;
+      score: number;
+      stage: ProgressStage;
+    };
+  };
+}
+
+export interface SchoolPolicyMaturity {
+  overallScore: number; // 0-100
+  overallStage: ProgressStage;
+  ictReadinessLevel: ICTReadinessLevel;
+  
+  // Core themes (8 themes from SABER)
+  visionPlanning: PolicyThemeScore;
+  ictInfrastructure: PolicyThemeScore;
+  teachers: PolicyThemeScore;
+  skillsCompetencies: PolicyThemeScore;
+  learningResources: PolicyThemeScore;
+  emis: PolicyThemeScore;
+  monitoringEvaluation: PolicyThemeScore;
+  equityInclusionSafety: PolicyThemeScore;
+  
+  // Cross-cutting themes (6 themes)
+  crossCuttingThemes: {
+    distanceEducation: { score: number; stage: ProgressStage };
+    mobiles: { score: number; stage: ProgressStage };
+    earlyChildhood: { score: number; stage: ProgressStage };
+    openEducationalResources: { score: number; stage: ProgressStage };
+    communityInvolvement: { score: number; stage: ProgressStage };
+    dataPrivacy: { score: number; stage: ProgressStage };
+  };
+  
+  lastCalculated: string;
+  dataCompleteness: number; // Percentage of available data used in calculation
 }
 
 interface ICTReadinessLevel {

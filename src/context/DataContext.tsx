@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { School, ICTReport } from '../types';
+import { calculateSchoolPolicyMaturity } from '../utils/schoolPolicyMaturity';
 import mockSchoolsData from '../data/mockSchools.json';
 import mockReportsData from '../data/mockReports.json';
 
@@ -46,6 +47,19 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Simulate API delay
   const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+  // Enrich schools with policy maturity data
+  const enrichSchoolsWithPolicyMaturity = (schoolsData: School[], reportsData: ICTReport[]): School[] => {
+    return schoolsData.map(school => {
+      const schoolReports = reportsData.filter(report => report.schoolId === school.id);
+      const policyMaturity = calculateSchoolPolicyMaturity(school, schoolReports);
+      
+      return {
+        ...school,
+        policyMaturity
+      };
+    });
+  };
+
   // Fetch schools with pagination and filtering
   const fetchSchools = async (
     page: number, 
@@ -82,11 +96,14 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const end = start + pageSize;
       const paginatedSchools = filteredSchools.slice(start, end);
 
+      // Enrich with policy maturity
+      const enrichedSchools = enrichSchoolsWithPolicyMaturity(paginatedSchools, reports);
+
       setTotalSchools(total);
-      setSchools(paginatedSchools);
+      setSchools(enrichedSchools);
 
       return {
-        data: paginatedSchools,
+        data: enrichedSchools,
         total,
         page,
         pageSize,
@@ -130,6 +147,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         id: generateId('SCH')
       };
       
+      // Calculate policy maturity for new school
+      const schoolReports = reports.filter(r => r.schoolId === newSchool.id);
+      const policyMaturity = calculateSchoolPolicyMaturity(newSchool, schoolReports);
+      newSchool.policyMaturity = policyMaturity;
+      
       setSchools(prevSchools => [...prevSchools, newSchool]);
       setTotalSchools(prev => prev + 1);
     } catch (err) {
@@ -145,8 +167,13 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setLoading(true);
       await delay(500);
 
+      // Recalculate policy maturity
+      const schoolReports = reports.filter(r => r.schoolId === school.id);
+      const policyMaturity = calculateSchoolPolicyMaturity(school, schoolReports);
+      const updatedSchool = { ...school, policyMaturity };
+
       setSchools(prevSchools => 
-        prevSchools.map(s => s.id === school.id ? school : s)
+        prevSchools.map(s => s.id === school.id ? updatedSchool : s)
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update school');
@@ -183,6 +210,18 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       };
       
       setReports(prevReports => [...prevReports, newReport]);
+
+      // Update policy maturity for the affected school
+      const school = schools.find(s => s.id === reportData.schoolId);
+      if (school) {
+        const schoolReports = [...reports, newReport].filter(r => r.schoolId === school.id);
+        const policyMaturity = calculateSchoolPolicyMaturity(school, schoolReports);
+        const updatedSchool = { ...school, policyMaturity };
+        
+        setSchools(prevSchools => 
+          prevSchools.map(s => s.id === school.id ? updatedSchool : s)
+        );
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to add report');
       throw err;
@@ -199,6 +238,19 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setReports(prevReports => 
         prevReports.map(r => r.id === report.id ? report : r)
       );
+
+      // Update policy maturity for the affected school
+      const school = schools.find(s => s.id === report.schoolId);
+      if (school) {
+        const schoolReports = reports.map(r => r.id === report.id ? report : r)
+          .filter(r => r.schoolId === school.id);
+        const policyMaturity = calculateSchoolPolicyMaturity(school, schoolReports);
+        const updatedSchool = { ...school, policyMaturity };
+        
+        setSchools(prevSchools => 
+          prevSchools.map(s => s.id === school.id ? updatedSchool : s)
+        );
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update report');
       throw err;
@@ -212,7 +264,22 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setLoading(true);
       await delay(500);
 
+      const reportToDelete = reports.find(r => r.id === id);
       setReports(prevReports => prevReports.filter(r => r.id !== id));
+
+      // Update policy maturity for the affected school
+      if (reportToDelete) {
+        const school = schools.find(s => s.id === reportToDelete.schoolId);
+        if (school) {
+          const schoolReports = reports.filter(r => r.id !== id && r.schoolId === school.id);
+          const policyMaturity = calculateSchoolPolicyMaturity(school, schoolReports);
+          const updatedSchool = { ...school, policyMaturity };
+          
+          setSchools(prevSchools => 
+            prevSchools.map(s => s.id === school.id ? updatedSchool : s)
+          );
+        }
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete report');
       throw err;

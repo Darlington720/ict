@@ -23,6 +23,7 @@ import {
   Radar
 } from 'recharts';
 import { calculateICTReadinessLevel, getLatestReport } from '../../utils/calculations';
+import { getProgressStageColor, getICTReadinessColor } from '../../utils/schoolPolicyMaturity';
 import { exportReportToPDF } from '../../utils/pdfExport';
 import { 
   ArrowLeft, 
@@ -54,7 +55,9 @@ import {
   Clock,
   Target,
   Award,
-  Info
+  Info,
+  Activity,
+  Layers
 } from 'lucide-react';
 
 interface SchoolDetailProps {
@@ -72,7 +75,7 @@ const SchoolDetail: React.FC<SchoolDetailProps> = ({
   onBack,
   onUpdateReport 
 }) => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'observations' | 'trends' | 'infrastructure'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'observations' | 'trends' | 'infrastructure' | 'progress'>('overview');
   const [editingReport, setEditingReport] = useState<ICTReport | null>(null);
   const [expandedReport, setExpandedReport] = useState<string | null>(null);
 
@@ -110,6 +113,24 @@ const SchoolDetail: React.FC<SchoolDetailProps> = ({
   };
 
   const infrastructureData = prepareInfrastructureData();
+
+  // Prepare policy maturity radar data
+  const preparePolicyMaturityData = () => {
+    if (!school.policyMaturity) return [];
+
+    return [
+      { theme: 'Vision & Planning', score: school.policyMaturity.visionPlanning.score, fullName: 'Vision and Planning' },
+      { theme: 'ICT Infrastructure', score: school.policyMaturity.ictInfrastructure.score, fullName: 'ICT Infrastructure' },
+      { theme: 'Teachers', score: school.policyMaturity.teachers.score, fullName: 'Teachers' },
+      { theme: 'Skills & Competencies', score: school.policyMaturity.skillsCompetencies.score, fullName: 'Skills and Competencies' },
+      { theme: 'Learning Resources', score: school.policyMaturity.learningResources.score, fullName: 'Learning Resources' },
+      { theme: 'EMIS', score: school.policyMaturity.emis.score, fullName: 'EMIS' },
+      { theme: 'Monitoring & Evaluation', score: school.policyMaturity.monitoringEvaluation.score, fullName: 'Monitoring & Evaluation' },
+      { theme: 'Equity & Safety', score: school.policyMaturity.equityInclusionSafety.score, fullName: 'Equity, Inclusion & Safety' }
+    ];
+  };
+
+  const policyMaturityData = preparePolicyMaturityData();
 
   // Get observation summary for a report
   const getObservationSummary = (report: ICTReport) => {
@@ -171,6 +192,7 @@ const SchoolDetail: React.FC<SchoolDetailProps> = ({
         <nav className="flex space-x-8" aria-label="Tabs">
           {[
             { id: 'overview', name: 'Overview', icon: SchoolIcon },
+            { id: 'progress', name: 'Progress Levels', icon: Target },
             { id: 'observations', name: 'Periodic Observations', icon: Calendar },
             { id: 'trends', name: 'Trends & Analysis', icon: TrendingUp },
             { id: 'infrastructure', name: 'Infrastructure Details', icon: Monitor }
@@ -264,23 +286,47 @@ const SchoolDetail: React.FC<SchoolDetailProps> = ({
               </Card>
             </div>
             
-            <div>
+            <div className="space-y-6">
+              {/* ICT Readiness Level */}
               <Card title="ICT Readiness Level">
                 <div className="text-center">
-                  <div className={`inline-flex items-center px-4 py-2 rounded-full text-lg font-semibold ${
-                    readinessLevel === 'High' ? 'bg-green-100 text-green-800' :
-                    readinessLevel === 'Medium' ? 'bg-amber-100 text-amber-800' :
-                    'bg-red-100 text-red-800'
-                  }`}>
-                    {readinessLevel === 'High' && <Award className="h-5 w-5 mr-2" />}
-                    {readinessLevel === 'Medium' && <Target className="h-5 w-5 mr-2" />}
-                    {readinessLevel === 'Low' && <AlertCircle className="h-5 w-5 mr-2" />}
-                    {readinessLevel} Readiness
+                  <div className={`inline-flex items-center px-4 py-2 rounded-full text-lg font-semibold`}
+                       style={{ 
+                         backgroundColor: `${getICTReadinessColor(school.policyMaturity?.ictReadinessLevel || 'Low')}20`, 
+                         color: getICTReadinessColor(school.policyMaturity?.ictReadinessLevel || 'Low') 
+                       }}>
+                    {school.policyMaturity?.ictReadinessLevel === 'High' && <Award className="h-5 w-5 mr-2" />}
+                    {school.policyMaturity?.ictReadinessLevel === 'Medium' && <Target className="h-5 w-5 mr-2" />}
+                    {school.policyMaturity?.ictReadinessLevel === 'Low' && <AlertCircle className="h-5 w-5 mr-2" />}
+                    {school.policyMaturity?.ictReadinessLevel || 'Low'} Readiness
                   </div>
                   <p className="text-3xl font-bold text-gray-900 mt-4">{readinessScore}/100</p>
                   <p className="text-sm text-gray-500 mt-2">
                     Based on {reports.length} observation{reports.length !== 1 ? 's' : ''}
                   </p>
+                </div>
+              </Card>
+
+              {/* Progress Level */}
+              <Card title="Overall Progress Level">
+                <div className="text-center">
+                  <div className={`inline-flex items-center px-4 py-2 rounded-full text-lg font-semibold`}
+                       style={{ 
+                         backgroundColor: `${getProgressStageColor(school.policyMaturity?.overallStage || 'Latent')}20`, 
+                         color: getProgressStageColor(school.policyMaturity?.overallStage || 'Latent') 
+                       }}>
+                    <Layers className="h-5 w-5 mr-2" />
+                    {school.policyMaturity?.overallStage || 'Latent'}
+                  </div>
+                  <p className="text-3xl font-bold text-gray-900 mt-4">{school.policyMaturity?.overallScore || 0}/100</p>
+                  <p className="text-sm text-gray-500 mt-2">
+                    Policy maturity score
+                  </p>
+                  {school.policyMaturity && (
+                    <p className="text-xs text-gray-400 mt-1">
+                      Data completeness: {school.policyMaturity.dataCompleteness}%
+                    </p>
+                  )}
                 </div>
               </Card>
             </div>
@@ -392,6 +438,169 @@ const SchoolDetail: React.FC<SchoolDetailProps> = ({
                   </div>
                 </div>
               </Card>
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === 'progress' && (
+        <div className="space-y-6">
+          {school.policyMaturity ? (
+            <>
+              {/* Overall Progress Summary */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <Card className="lg:col-span-2" title="Progress Level Breakdown">
+                  <div className="h-80">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <RadarChart data={policyMaturityData}>
+                        <PolarGrid />
+                        <PolarAngleAxis dataKey="theme" tick={{ fontSize: 10 }} />
+                        <PolarRadiusAxis domain={[0, 100]} tick={{ fontSize: 10 }} />
+                        <Radar
+                          name="Progress Score"
+                          dataKey="score"
+                          stroke="#3B82F6"
+                          fill="#3B82F6"
+                          fillOpacity={0.3}
+                          strokeWidth={2}
+                        />
+                        <Tooltip 
+                          labelFormatter={(label) => {
+                            const item = policyMaturityData.find(d => d.theme === label);
+                            return item?.fullName || label;
+                          }}
+                        />
+                      </RadarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </Card>
+
+                <Card title="Progress Summary">
+                  <div className="space-y-4">
+                    <div className="text-center p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg">
+                      <div className="text-2xl font-bold" style={{ color: getProgressStageColor(school.policyMaturity.overallStage) }}>
+                        {school.policyMaturity.overallScore}/100
+                      </div>
+                      <div className="text-sm font-medium" style={{ color: getProgressStageColor(school.policyMaturity.overallStage) }}>
+                        {school.policyMaturity.overallStage} Stage
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span>ICT Readiness:</span>
+                        <span className="font-medium" style={{ color: getICTReadinessColor(school.policyMaturity.ictReadinessLevel) }}>
+                          {school.policyMaturity.ictReadinessLevel}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span>Data Completeness:</span>
+                        <span className="font-medium">{school.policyMaturity.dataCompleteness}%</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span>Last Calculated:</span>
+                        <span className="font-medium">{new Date(school.policyMaturity.lastCalculated).toLocaleDateString()}</span>
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+              </div>
+
+              {/* Detailed Theme Scores */}
+              <Card title="Detailed Progress Analysis">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {[
+                    school.policyMaturity.visionPlanning,
+                    school.policyMaturity.ictInfrastructure,
+                    school.policyMaturity.teachers,
+                    school.policyMaturity.skillsCompetencies,
+                    school.policyMaturity.learningResources,
+                    school.policyMaturity.emis,
+                    school.policyMaturity.monitoringEvaluation,
+                    school.policyMaturity.equityInclusionSafety
+                  ].map((theme) => (
+                    <div key={theme.code} className="border border-gray-200 rounded-lg p-4">
+                      <div className="flex justify-between items-start mb-3">
+                        <div className="flex-1">
+                          <h4 className="font-medium text-gray-900">{theme.name}</h4>
+                          <div className="flex items-center mt-1">
+                            <span className="text-lg font-bold mr-2" style={{ color: getProgressStageColor(theme.stage) }}>
+                              {theme.score}/100
+                            </span>
+                            <span 
+                              className="px-2 py-1 text-xs font-medium rounded-full"
+                              style={{ 
+                                backgroundColor: `${getProgressStageColor(theme.stage)}20`, 
+                                color: getProgressStageColor(theme.stage) 
+                              }}
+                            >
+                              {theme.stage}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        {Object.entries(theme.subScores).map(([key, subScore]) => (
+                          <div key={key} className="flex justify-between items-center text-sm">
+                            <span className="text-gray-600">{subScore.name}:</span>
+                            <div className="flex items-center">
+                              <span className="font-medium mr-2">{subScore.score}</span>
+                              <span 
+                                className="px-1.5 py-0.5 text-xs rounded"
+                                style={{ 
+                                  backgroundColor: `${getProgressStageColor(subScore.stage)}20`, 
+                                  color: getProgressStageColor(subScore.stage) 
+                                }}
+                              >
+                                {subScore.stage}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+
+              {/* Cross-Cutting Themes */}
+              <Card title="Cross-Cutting Themes">
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  {Object.entries(school.policyMaturity.crossCuttingThemes).map(([key, theme]) => (
+                    <div key={key} className="text-center p-4 border border-gray-200 rounded-lg">
+                      <div className="text-lg font-bold" style={{ color: getProgressStageColor(theme.stage) }}>
+                        {theme.score}/100
+                      </div>
+                      <div className="text-sm font-medium text-gray-900 mt-1">
+                        {key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
+                      </div>
+                      <div 
+                        className="text-xs px-2 py-1 rounded-full mt-2 inline-block"
+                        style={{ 
+                          backgroundColor: `${getProgressStageColor(theme.stage)}20`, 
+                          color: getProgressStageColor(theme.stage) 
+                        }}
+                      >
+                        {theme.stage}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            </>
+          ) : (
+            <div className="text-center py-12 bg-white rounded-lg border border-gray-200">
+              <Target className="h-12 w-12 mx-auto text-gray-300 mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">Progress Analysis Not Available</h3>
+              <p className="text-gray-500 mb-6">Add periodic observations to calculate progress levels and policy maturity.</p>
+              <button
+                onClick={onAddReport}
+                className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Add First Observation
+              </button>
             </div>
           )}
         </div>
@@ -535,10 +744,6 @@ const SchoolDetail: React.FC<SchoolDetailProps> = ({
                                 <span className="font-medium">{report.infrastructure.projectors}</span>
                               </div>
                               <div className="flex justify-between text-sm">
-                                <span>Printers:</span>
-                                <span className="font-medium">{report.infrastructure.printers}</span>
-                              </div>
-                              <div className="flex justify-between text-sm">
                                 <span>Internet Speed:</span>
                                 <span className="font-medium">
                                   {report.infrastructure.internetConnection === 'None' 
@@ -593,9 +798,9 @@ const SchoolDetail: React.FC<SchoolDetailProps> = ({
                               <Settings className="h-4 w-4 mr-2" />
                               Software & Content
                             </h5>
-                            <div className="space-y-3">
+                            <div className="space-y-2">
                               <div>
-                                <span className="text-xs text-gray-600">Operating Systems:</span>
+                                <span className="text-sm text-gray-600">Operating Systems:</span>
                                 <div className="flex flex-wrap gap-1 mt-1">
                                   {report.software.operatingSystems.map((os) => (
                                     <span key={os} className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
@@ -605,7 +810,7 @@ const SchoolDetail: React.FC<SchoolDetailProps> = ({
                                 </div>
                               </div>
                               <div>
-                                <span className="text-xs text-gray-600">Educational Software:</span>
+                                <span className="text-sm text-gray-600">Educational Software:</span>
                                 <div className="flex flex-wrap gap-1 mt-1">
                                   {report.software.educationalSoftware.length > 0 ? (
                                     report.software.educationalSoftware.map((software) => (
@@ -811,7 +1016,7 @@ const SchoolDetail: React.FC<SchoolDetailProps> = ({
                     <span className="text-sm font-medium">Internet Connection</span>
                   </div>
                   <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                    latestReport.infrastructure.internetConnection === 'Fast' ? 'bg-green-100 text-green-800' :
+                    latest Report.infrastructure.internetConnection === 'Fast' ? 'bg-green-100 text-green-800' :
                     latestReport.infrastructure.internetConnection === 'Medium' ? 'bg-amber-100 text-amber-800' :
                     latestReport.infrastructure.internetConnection === 'Slow' ? 'bg-red-100 text-red-800' :
                     'bg-gray-100 text-gray-800'

@@ -25,6 +25,7 @@ import {
   Radar
 } from 'recharts';
 import { calculateSummaryStats, calculateICTReadinessLevel, getLatestReport } from '../../utils/calculations';
+import { getProgressStageColor, getICTReadinessColor } from '../../utils/schoolPolicyMaturity';
 import { 
   Laptop, 
   Wifi, 
@@ -42,7 +43,9 @@ import {
   Battery,
   BookOpen,
   GraduationCap,
-  Settings
+  Settings,
+  Zap,
+  Activity
 } from 'lucide-react';
 
 interface DashboardProps {
@@ -77,6 +80,32 @@ const Dashboard: React.FC<DashboardProps> = ({ schools, reports }) => {
     }
   ];
 
+  // Prepare policy maturity distribution
+  const policyMaturityData = schools.reduce((acc, school) => {
+    const stage = school.policyMaturity?.overallStage || 'Latent';
+    acc[stage] = (acc[stage] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+
+  const maturityDistributionData = Object.entries(policyMaturityData).map(([stage, count]) => ({
+    name: stage,
+    value: count,
+    percentage: ((count / schools.length) * 100).toFixed(1)
+  }));
+
+  // Prepare ICT readiness distribution
+  const readinessData = schools.reduce((acc, school) => {
+    const level = school.policyMaturity?.ictReadinessLevel || 'Low';
+    acc[level] = (acc[level] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+
+  const readinessDistributionData = Object.entries(readinessData).map(([level, count]) => ({
+    name: level,
+    value: count,
+    percentage: ((count / schools.length) * 100).toFixed(1)
+  }));
+
   // Prepare trend data for periodic observations
   const prepareTrendData = () => {
     return periods.map(period => {
@@ -104,6 +133,14 @@ const Dashboard: React.FC<DashboardProps> = ({ schools, reports }) => {
         report.infrastructure.powerBackup
       ).length / periodReports.length) * 100;
 
+      // Calculate average policy maturity for this period
+      const schoolsWithReports = schools.filter(school => 
+        periodReports.some(report => report.schoolId === school.id)
+      );
+      const avgPolicyScore = schoolsWithReports.reduce((sum, school) => 
+        sum + (school.policyMaturity?.overallScore || 0), 0
+      ) / schoolsWithReports.length;
+
       return {
         period,
         teacherUsage: Math.round(avgTeacherUsage),
@@ -111,6 +148,7 @@ const Dashboard: React.FC<DashboardProps> = ({ schools, reports }) => {
         functionalDevices: Math.round(avgFunctionalDevices),
         internetAccess: Math.round(internetAccessPercent),
         powerBackup: Math.round(powerBackupPercent),
+        policyMaturity: Math.round(avgPolicyScore),
         totalObservations: periodReports.length
       };
     }).filter(Boolean);
@@ -144,6 +182,14 @@ const Dashboard: React.FC<DashboardProps> = ({ schools, reports }) => {
     ) / latestReports.length;
     const avgSupportStaff = latestReports.reduce((sum, report) => sum + report.capacity.supportStaff, 0) / latestReports.length;
 
+    // Policy maturity metrics
+    const schoolsWithLatestReports = schools.filter(school => 
+      latestReports.some(report => report.schoolId === school.id)
+    );
+    const avgPolicyScore = schoolsWithLatestReports.reduce((sum, school) => 
+      sum + (school.policyMaturity?.overallScore || 0), 0
+    ) / schoolsWithLatestReports.length;
+
     return {
       infrastructure: {
         avgComputers: Math.round(avgComputers),
@@ -160,31 +206,15 @@ const Dashboard: React.FC<DashboardProps> = ({ schools, reports }) => {
         avgTrainedTeachers: Math.round(avgTrainedTeachers),
         avgSupportStaff: Math.round(avgSupportStaff * 10) / 10
       },
+      policy: {
+        avgPolicyScore: Math.round(avgPolicyScore)
+      },
       totalObservations: latestReports.length,
       period: latestPeriod
     };
   };
 
   const performanceMetrics = calculatePerformanceMetrics();
-
-  // Prepare readiness level distribution
-  const prepareReadinessDistribution = () => {
-    const readinessLevels = { High: 0, Medium: 0, Low: 0 };
-    
-    schools.forEach(school => {
-      const schoolReports = reports.filter(r => r.schoolId === school.id);
-      const { level } = calculateICTReadinessLevel(schoolReports);
-      readinessLevels[level]++;
-    });
-
-    return Object.entries(readinessLevels).map(([level, count]) => ({
-      name: level,
-      value: count,
-      percentage: ((count / schools.length) * 100).toFixed(1)
-    }));
-  };
-
-  const readinessData = prepareReadinessDistribution();
 
   // Prepare infrastructure comparison data
   const prepareInfrastructureComparison = () => {
@@ -255,6 +285,19 @@ const Dashboard: React.FC<DashboardProps> = ({ schools, reports }) => {
       });
     }
 
+    // Schools with low policy maturity
+    const lowMaturitySchools = schools.filter(school => 
+      (school.policyMaturity?.overallScore || 0) < 40
+    ).length;
+    if (lowMaturitySchools > 0) {
+      alerts.push({
+        type: 'warning',
+        title: 'Low Policy Maturity',
+        message: `${lowMaturitySchools} schools have low progress levels`,
+        action: 'Focus on strategic planning and capacity building'
+      });
+    }
+
     // Schools with few functional devices
     const lowDeviceSchools = latestReports.filter(report => 
       report.infrastructure.functionalDevices < 10
@@ -280,11 +323,11 @@ const Dashboard: React.FC<DashboardProps> = ({ schools, reports }) => {
     <div>
       <PageHeader 
         title="ICT Observatory Dashboard" 
-        description="Comprehensive overview of ICT infrastructure and periodic observations across primary schools"
+        description="Comprehensive overview of ICT infrastructure, progress levels, and periodic observations across primary schools"
       />
 
       {/* Key Performance Indicators */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-6">
         <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white">
           <div className="flex items-center">
             <div className="p-3 rounded-full bg-blue-400 bg-opacity-30">
@@ -350,6 +393,23 @@ const Dashboard: React.FC<DashboardProps> = ({ schools, reports }) => {
             </div>
           </div>
         </Card>
+
+        <Card className="bg-gradient-to-br from-indigo-500 to-indigo-600 text-white">
+          <div className="flex items-center">
+            <div className="p-3 rounded-full bg-indigo-400 bg-opacity-30">
+              <Target className="h-6 w-6" />
+            </div>
+            <div className="ml-4">
+              <p className="text-indigo-100 text-sm font-medium">Avg Progress Level</p>
+              <h3 className="text-2xl font-bold">
+                {performanceMetrics?.policy.avgPolicyScore || 'N/A'}/100
+              </h3>
+              <p className="text-indigo-200 text-xs">
+                Policy maturity score
+              </p>
+            </div>
+          </div>
+        </Card>
       </div>
 
       {/* Alerts and Recommendations */}
@@ -395,10 +455,67 @@ const Dashboard: React.FC<DashboardProps> = ({ schools, reports }) => {
         </Card>
       )}
 
+      {/* Progress Level and ICT Readiness Distribution */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <Card title="School Progress Level Distribution">
+          <div className="h-80">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={maturityDistributionData}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={false}
+                  label={({ name, percentage }) => `${name}: ${percentage}%`}
+                  outerRadius={80}
+                  fill="#8884d8"
+                  dataKey="value"
+                >
+                  {maturityDistributionData.map((entry, index) => (
+                    <Cell 
+                      key={`cell-${index}`} 
+                      fill={getProgressStageColor(entry.name as any)} 
+                    />
+                  ))}
+                </Pie>
+                <Tooltip formatter={(value, name) => [`${value} schools`, name]} />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        </Card>
+
+        <Card title="ICT Readiness Level Distribution">
+          <div className="h-80">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={readinessDistributionData}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={false}
+                  label={({ name, percentage }) => `${name}: ${percentage}%`}
+                  outerRadius={80}
+                  fill="#8884d8"
+                  dataKey="value"
+                >
+                  {readinessDistributionData.map((entry, index) => (
+                    <Cell 
+                      key={`cell-${index}`} 
+                      fill={getICTReadinessColor(entry.name as any)} 
+                    />
+                  ))}
+                </Pie>
+                <Tooltip formatter={(value, name) => [`${value} schools`, name]} />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        </Card>
+      </div>
+
       {/* Trend Analysis */}
       {trendData.length > 0 && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-          <Card title="ICT Usage Trends Over Time">
+          <Card title="ICT Usage & Progress Trends Over Time">
             <div className="h-80">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={trendData}>
@@ -423,9 +540,9 @@ const Dashboard: React.FC<DashboardProps> = ({ schools, reports }) => {
                   />
                   <Line 
                     type="monotone" 
-                    dataKey="internetAccess" 
-                    stroke="#FFB300" 
-                    name="Internet Access (%)"
+                    dataKey="policyMaturity" 
+                    stroke="#8E24AA" 
+                    name="Progress Level Score"
                     strokeWidth={2}
                   />
                 </LineChart>
@@ -467,33 +584,6 @@ const Dashboard: React.FC<DashboardProps> = ({ schools, reports }) => {
 
       {/* Performance Distribution */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-        <Card title="ICT Readiness Distribution">
-          <div className="h-80">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={readinessData}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={({ name, percentage }) => `${name}: ${percentage}%`}
-                  outerRadius={80}
-                  fill="#8884d8"
-                  dataKey="value"
-                >
-                  {readinessData.map((entry, index) => (
-                    <Cell 
-                      key={`cell-${index}`} 
-                      fill={entry.name === 'High' ? '#22C55E' : entry.name === 'Medium' ? '#F59E0B' : '#EF4444'} 
-                    />
-                  ))}
-                </Pie>
-                <Tooltip formatter={(value, name) => [`${value} schools`, name]} />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-        </Card>
-
         <Card title="Schools by District">
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
@@ -544,30 +634,11 @@ const Dashboard: React.FC<DashboardProps> = ({ schools, reports }) => {
             </ResponsiveContainer>
           </div>
         </Card>
-      </div>
-
-      {/* Infrastructure Comparison */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        <Card title="Infrastructure: Urban vs Rural">
-          <div className="h-80">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={infrastructureComparison}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                <Bar dataKey="Urban" fill="#8B5CF6" name="Urban Schools" />
-                <Bar dataKey="Rural" fill="#F97316" name="Rural Schools" />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </Card>
 
         <Card title="Performance Metrics Summary">
           {performanceMetrics ? (
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4">
                 <div className="bg-blue-50 p-4 rounded-lg">
                   <div className="flex items-center">
                     <Monitor className="h-5 w-5 text-blue-500 mr-2" />
@@ -604,27 +675,15 @@ const Dashboard: React.FC<DashboardProps> = ({ schools, reports }) => {
                   </div>
                 </div>
 
-                <div className="bg-amber-50 p-4 rounded-lg">
-                  <div className="flex items-center">
-                    <Users className="h-5 w-5 text-amber-500 mr-2" />
-                    <span className="text-sm font-medium text-amber-700">Capacity</span>
-                  </div>
-                  <div className="mt-2 space-y-1">
-                    <div className="text-xs text-amber-600">
-                      Trained Teachers: {performanceMetrics.capacity.avgTrainedTeachers}%
-                    </div>
-                    <div className="text-xs text-amber-600">
-                      Support Staff: {performanceMetrics.capacity.avgSupportStaff}
-                    </div>
-                  </div>
-                </div>
-
                 <div className="bg-purple-50 p-4 rounded-lg">
                   <div className="flex items-center">
-                    <Calendar className="h-5 w-5 text-purple-500 mr-2" />
-                    <span className="text-sm font-medium text-purple-700">Latest Period</span>
+                    <Target className="h-5 w-5 text-purple-500 mr-2" />
+                    <span className="text-sm font-medium text-purple-700">Progress Level</span>
                   </div>
                   <div className="mt-2 space-y-1">
+                    <div className="text-xs text-purple-600">
+                      Avg Score: {performanceMetrics.policy.avgPolicyScore}/100
+                    </div>
                     <div className="text-xs text-purple-600">
                       Period: {performanceMetrics.period}
                     </div>
@@ -645,87 +704,55 @@ const Dashboard: React.FC<DashboardProps> = ({ schools, reports }) => {
         </Card>
       </div>
 
-      {/* Top Performing Schools */}
-      <Card title="Top Performing Schools (ICT Readiness)">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rank</th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">School</th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">District</th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Environment</th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Latest Observation</th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Readiness Level</th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Key Strengths</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {schools.slice(0, 5).map((school, index) => {
-                const latestReport = getLatestReport(school.id, reports);
-                const schoolReports = reports.filter(r => r.schoolId === school.id);
-                const { level, score } = calculateICTReadinessLevel(schoolReports);
-                
-                const strengths = [];
-                if (latestReport) {
-                  if (latestReport.infrastructure.functionalDevices >= 20) strengths.push('Good Infrastructure');
-                  if (latestReport.infrastructure.internetConnection !== 'None') strengths.push('Internet Access');
-                  if ((latestReport.usage.teachersUsingICT / latestReport.usage.totalTeachers) >= 0.7) strengths.push('High Teacher Usage');
-                  if (latestReport.usage.studentDigitalLiteracyRate >= 70) strengths.push('High Student Literacy');
-                }
+      {/* Infrastructure Comparison */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <Card title="Infrastructure: Urban vs Rural">
+          <div className="h-80">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={infrastructureComparison}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="name" />
+                <YAxis />
+                <Tooltip />
+                <Legend />
+                <Bar dataKey="Urban" fill="#8B5CF6" name="Urban Schools" />
+                <Bar dataKey="Rural" fill="#F97316" name="Rural Schools" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </Card>
 
-                return (
-                  <tr key={school.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      <div className="flex items-center">
-                        {index < 3 && <Award className="h-4 w-4 text-amber-500 mr-1" />}
-                        #{index + 1}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{school.name}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{school.district}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                        school.environment === 'Urban' ? 'bg-purple-100 text-purple-800' : 'bg-orange-100 text-orange-800'
-                      }`}>
-                        {school.environment}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {latestReport ? latestReport.period : 'No observations'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                          level === 'High' ? 'bg-green-100 text-green-800' :
-                          level === 'Medium' ? 'bg-amber-100 text-amber-800' :
-                          'bg-red-100 text-red-800'
-                        }`}>
-                          {level}
-                        </span>
-                        <span className="ml-2 text-xs text-gray-500">({score.toFixed(1)})</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-500">
-                      <div className="flex flex-wrap gap-1">
-                        {strengths.length > 0 ? (
-                          strengths.map((strength, idx) => (
-                            <span key={idx} className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
-                              {strength}
-                            </span>
-                          ))
-                        ) : (
-                          <span className="text-xs text-gray-400">No data available</span>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </Card>
+        <Card title="Top Performing Schools (Progress Level)">
+          <div className="space-y-3">
+            {schools
+              .filter(school => school.policyMaturity)
+              .sort((a, b) => (b.policyMaturity?.overallScore || 0) - (a.policyMaturity?.overallScore || 0))
+              .slice(0, 5)
+              .map((school, index) => (
+                <div key={school.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <div className="flex items-center">
+                    <div className="flex items-center mr-3">
+                      {index < 3 && <Award className="h-4 w-4 text-amber-500 mr-1" />}
+                      <span className="text-sm font-medium text-gray-600">#{index + 1}</span>
+                    </div>
+                    <div>
+                      <div className="text-sm font-medium text-gray-900">{school.name}</div>
+                      <div className="text-xs text-gray-500">{school.district}</div>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-sm font-bold" style={{ color: getProgressStageColor(school.policyMaturity?.overallStage || 'Latent') }}>
+                      {school.policyMaturity?.overallScore}/100
+                    </div>
+                    <div className="text-xs" style={{ color: getProgressStageColor(school.policyMaturity?.overallStage || 'Latent') }}>
+                      {school.policyMaturity?.overallStage}
+                    </div>
+                  </div>
+                </div>
+              ))}
+          </div>
+        </Card>
+      </div>
     </div>
   );
 };
