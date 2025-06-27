@@ -12,6 +12,7 @@ import SchoolDetailPage from './pages/SchoolDetailPage';
 import ComparePage from './pages/ComparePage';
 import MapPage from './pages/MapPage';
 import ReportsPage from './pages/ReportsPage';
+import PolicyPage from './pages/PolicyPage';
 import UserManagementPage from './pages/UserManagementPage';
 
 const AppContent: React.FC = () => {
@@ -73,6 +74,14 @@ const AppContent: React.FC = () => {
           element={
             <ProtectedRoute requiredPermissions={['canViewAllReports']}>
               <ReportsPage />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/policy" 
+          element={
+            <ProtectedRoute requiredPermissions={['canViewAnalytics']}>
+              <PolicyPage />
             </ProtectedRoute>
           } 
         />

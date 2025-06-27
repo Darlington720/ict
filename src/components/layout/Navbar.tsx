@@ -33,7 +33,8 @@ import {
   Battery,
   Target,
   Eye,
-  Plus
+  Plus,
+  Gavel
 } from 'lucide-react';
 
 const Navbar: React.FC = () => {
@@ -127,6 +128,28 @@ const Navbar: React.FC = () => {
       ].filter(item => item.show)
     },
     {
+      name: 'Policy',
+      icon: Gavel,
+      show: permissions.canViewAnalytics,
+      description: 'SABER-ICT Policy Framework',
+      submenu: [
+        {
+          name: 'Policy Dashboard',
+          href: '/policy',
+          icon: Target,
+          description: 'Policy maturity overview',
+          show: permissions.canViewAnalytics
+        },
+        {
+          name: 'New Assessment',
+          href: '/policy/assess',
+          icon: Plus,
+          description: 'Create policy assessment',
+          show: permissions.canEditAllReports
+        }
+      ].filter(item => item.show)
+    },
+    {
       name: 'Administration',
       icon: Settings,
       show: permissions.canManageUsers,
@@ -211,18 +234,6 @@ const Navbar: React.FC = () => {
                   <p className="text-xs text-gray-500 -mt-1">Primary Schools Monitoring</p>
                 </div>
               </Link>
-
-              {/* Quick Stats (Desktop) */}
-              <div className="hidden xl:flex items-center space-x-4 ml-8 pl-8 border-l border-gray-200">
-                {/* <div className="flex items-center space-x-2 px-3 py-1.5 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-full">
-                  <Activity className="h-4 w-4 text-blue-600" />
-                  <span className="text-sm font-medium text-blue-700">Live</span>
-                </div>
-                <div className="flex items-center space-x-2 px-3 py-1.5 bg-gradient-to-r from-green-50 to-emerald-50 rounded-full">
-                  <TrendingUp className="h-4 w-4 text-green-600" />
-                  <span className="text-sm font-medium text-green-700">500+ Schools</span>
-                </div> */}
-              </div>
             </div>
 
             {/* Desktop Navigation */}
@@ -317,20 +328,6 @@ const Navbar: React.FC = () => {
 
             {/* Right Section */}
             <div className="flex items-center space-x-3">
-              {/* Search (Desktop) */}
-              {/* <div className="hidden xl:block">
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <Search className="h-4 w-4 text-gray-400" />
-                  </div>
-                  <input
-                    type="text"
-                    placeholder="Quick search..."
-                    className="block w-64 pl-10 pr-3 py-2 border border-gray-200 rounded-xl text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50/50 hover:bg-white transition-colors duration-200"
-                  />
-                </div>
-              </div>  */}
-
               {/* Notifications */}
               <div className="relative">
                 <button
