@@ -1016,7 +1016,7 @@ const SchoolDetail: React.FC<SchoolDetailProps> = ({
                     <span className="text-sm font-medium">Internet Connection</span>
                   </div>
                   <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                    latest Report.infrastructure.internetConnection === 'Fast' ? 'bg-green-100 text-green-800' :
+                    latestReport.infrastructure.internetConnection === 'Fast' ? 'bg-green-100 text-green-800' :
                     latestReport.infrastructure.internetConnection === 'Medium' ? 'bg-amber-100 text-amber-800' :
                     latestReport.infrastructure.internetConnection === 'Slow' ? 'bg-red-100 text-red-800' :
                     'bg-gray-100 text-gray-800'
