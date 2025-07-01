@@ -78,64 +78,64 @@ const SchoolForm: React.FC<SchoolFormProps> = ({ school, onSubmit, onCancel }) =
   const [locationError, setLocationError] = useState<string>('');
   const [locationSuccess, setLocationSuccess] = useState(false);
 
-  // Handle geolocation
-  const getCurrentLocation = async () => {
-    if (!navigator.geolocation) {
-      setLocationError('Geolocation is not supported by this browser');
-      return;
-    }
-
-    setIsGettingLocation(true);
-    setLocationError('');
-    setLocationSuccess(false);
-
-    const options = {
-      enableHighAccuracy: true,
-      timeout: 10000,
-      maximumAge: 60000
+    // Handle geolocation
+    const getCurrentLocation = async () => {
+      if (!navigator.geolocation) {
+        setLocationError('Geolocation is not supported by this browser');
+        return;
+      }
+  
+      setIsGettingLocation(true);
+      setLocationError('');
+      setLocationSuccess(false);
+  
+      const options = {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 60000
+      };
+  
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          setFormData(prev => ({
+            ...prev,
+            latitude: parseFloat(latitude.toFixed(6)),
+            longitude: parseFloat(longitude.toFixed(6))
+          }));
+          setIsGettingLocation(false);
+          setLocationSuccess(true);
+          
+          // Clear success message after 3 seconds
+          setTimeout(() => setLocationSuccess(false), 3000);
+        },
+        (error) => {
+          setIsGettingLocation(false);
+          let errorMessage = 'Unable to get your location';
+          
+          switch (error.code) {
+            case error.PERMISSION_DENIED:
+              errorMessage = 'Location access denied. Please enable location permissions and try again.';
+              break;
+            case error.POSITION_UNAVAILABLE:
+              errorMessage = 'Location information is unavailable. Please check your GPS settings.';
+              break;
+            case error.TIMEOUT:
+              errorMessage = 'Location request timed out. Please try again.';
+              break;
+            default:
+              errorMessage = 'An unknown error occurred while getting your location.';
+              break;
+          }
+          
+          setLocationError(errorMessage);
+          
+          // Clear error message after 5 seconds
+          setTimeout(() => setLocationError(''), 5000);
+        },
+        options
+      );
     };
-
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const { latitude, longitude } = position.coords;
-        setFormData(prev => ({
-          ...prev,
-          latitude: parseFloat(latitude.toFixed(6)),
-          longitude: parseFloat(longitude.toFixed(6))
-        }));
-        setIsGettingLocation(false);
-        setLocationSuccess(true);
-        
-        // Clear success message after 3 seconds
-        setTimeout(() => setLocationSuccess(false), 3000);
-      },
-      (error) => {
-        setIsGettingLocation(false);
-        let errorMessage = 'Unable to get your location';
-        
-        switch (error.code) {
-          case error.PERMISSION_DENIED:
-            errorMessage = 'Location access denied. Please enable location permissions and try again.';
-            break;
-          case error.POSITION_UNAVAILABLE:
-            errorMessage = 'Location information is unavailable. Please check your GPS settings.';
-            break;
-          case error.TIMEOUT:
-            errorMessage = 'Location request timed out. Please try again.';
-            break;
-          default:
-            errorMessage = 'An unknown error occurred while getting your location.';
-            break;
-        }
-        
-        setLocationError(errorMessage);
-        
-        // Clear error message after 5 seconds
-        setTimeout(() => setLocationError(''), 5000);
-      },
-      options
-    );
-  };
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
