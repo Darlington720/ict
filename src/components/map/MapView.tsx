@@ -185,11 +185,16 @@ const MapView: React.FC<MapViewProps> = ({ schools, reports }) => {
 
         <div className="md:col-span-3">
           <Card title="School Locations">
-            <div className="h-[600px]">
+            <div className="h-[600px] relative z-10">
               <MapContainer 
                 center={ugandaCenter} 
                 zoom={7} 
-                style={{ height: '100%', width: '100%' }}
+                style={{ 
+                  height: '100%', 
+                  width: '100%',
+                  zIndex: 1
+                }}
+                zoomControl={true}
               >
                 <TileLayer
                   attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
