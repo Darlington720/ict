@@ -40,7 +40,8 @@ import {
   TrendingUp,
   Eye,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  AlertCircle
 } from 'lucide-react';
 
 interface CompareSchoolsProps {
@@ -159,22 +160,27 @@ const CompareSchools: React.FC<CompareSchoolsProps> = ({ schools, reports }) => 
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Get selected school objects with their latest reports
+  // Get selected school objects with their latest reports (now includes schools without reports)
   const selectedSchoolsData = selectedSchools.map(schoolId => {
     const school = schools.find(s => s.id === schoolId);
     const latestReport = getLatestReport(schoolId, reports);
     return { school, latestReport };
-  }).filter(item => item.school && item.latestReport);
+  }).filter(item => item.school); // Only filter out if school doesn't exist
 
-  // Get KPI status (traffic light system)
-  const getKPIStatus = (value: number, thresholds: { good: number; fair: number }) => {
+  // Get KPI status (traffic light system) - updated to handle no data
+  const getKPIStatus = (value: number | null, thresholds: { good: number; fair: number }) => {
+    if (value === null || isNaN(value)) {
+      return { status: 'no_data', color: '#9CA3AF', label: 'No Data' };
+    }
     if (value >= thresholds.good) return { status: 'good', color: '#22C55E', label: 'Good' };
     if (value >= thresholds.fair) return { status: 'fair', color: '#F59E0B', label: 'Fair' };
     return { status: 'poor', color: '#EF4444', label: 'Poor' };
   };
 
-  // Calculate metric value for a school
-  const getMetricValue = (school: School, report: ICTReport, metric: string) => {
+  // Calculate metric value for a school - updated to handle undefined reports
+  const getMetricValue = (school: School, report: ICTReport | undefined, metric: string): number => {
+    if (!report) return NaN; // Return NaN for all report-based metrics when no report exists
+    
     switch (metric) {
       case 'computers': return report.infrastructure.computers;
       case 'tablets': return report.infrastructure.tablets;
@@ -191,11 +197,11 @@ const CompareSchools: React.FC<CompareSchoolsProps> = ({ schools, reports }) => 
       case 'weeklyHours': return report.usage.weeklyComputerLabHours;
       case 'trainedTeachers': return (report.capacity.ictTrainedTeachers / report.usage.totalTeachers) * 100;
       case 'supportStaff': return report.capacity.supportStaff;
-      default: return 0;
+      default: return NaN;
     }
   };
 
-  // Prepare data for radar chart
+  // Prepare data for radar chart - updated to handle schools without reports
   const prepareRadarData = () => {
     const metrics = selectedCategory === 'overall' ? [
       { name: 'Infrastructure', key: 'infrastructure', max: 100 },
@@ -219,10 +225,16 @@ const CompareSchools: React.FC<CompareSchoolsProps> = ({ schools, reports }) => 
         const school = schools.find(s => s.id === schoolId);
         const latestReport = getLatestReport(schoolId, reports);
         
-        if (school && latestReport) {
+        if (school) {
           let value = 0;
           
           if (selectedCategory === 'overall') {
+            // Check if report exists before calculating aggregate scores
+            if (!latestReport) {
+              dataPoint[school.name] = NaN;
+              return;
+            }
+            
             // Calculate aggregate scores for overall view
             if (metric.key === 'infrastructure') {
               value = (
@@ -250,7 +262,7 @@ const CompareSchools: React.FC<CompareSchoolsProps> = ({ schools, reports }) => 
             value = getMetricValue(school, latestReport, metric.key);
           }
           
-          dataPoint[school.name] = Math.min(metric.max, value);
+          dataPoint[school.name] = isNaN(value) ? null : Math.min(metric.max, value);
         }
       });
       
@@ -258,7 +270,7 @@ const CompareSchools: React.FC<CompareSchoolsProps> = ({ schools, reports }) => 
     });
   };
 
-  // Prepare data for bar chart
+  // Prepare data for bar chart - updated to handle schools without reports
   const prepareBarData = () => {
     if (selectedCategory === 'overall') return [];
     
@@ -271,8 +283,9 @@ const CompareSchools: React.FC<CompareSchoolsProps> = ({ schools, reports }) => 
         const school = schools.find(s => s.id === schoolId);
         const latestReport = getLatestReport(schoolId, reports);
         
-        if (school && latestReport) {
-          dataPoint[school.name] = getMetricValue(school, latestReport, metric);
+        if (school) {
+          const value = getMetricValue(school, latestReport, metric);
+          dataPoint[school.name] = isNaN(value) ? null : value;
         }
       });
       
@@ -280,10 +293,24 @@ const CompareSchools: React.FC<CompareSchoolsProps> = ({ schools, reports }) => 
     });
   };
 
-  // Prepare KPI data
+  // Prepare KPI data - updated to handle schools without reports
   const prepareKPIData = () => {
     return selectedSchoolsData.map(({ school, latestReport }) => {
-      if (!school || !latestReport) return null;
+      if (!school) return null;
+
+      if (!latestReport) {
+        // Return KPI data with "No Data" status for schools without reports
+        return {
+          school: school.name,
+          kpis: {
+            infrastructure: getKPIStatus(null, { good: 30, fair: 15 }),
+            connectivity: getKPIStatus(null, { good: 75, fair: 40 }),
+            teacherUsage: getKPIStatus(null, { good: 70, fair: 40 }),
+            studentLiteracy: getKPIStatus(null, { good: 70, fair: 40 }),
+            trainedTeachers: getKPIStatus(null, { good: 70, fair: 40 })
+          }
+        };
+      }
 
       const teacherUsage = (latestReport.usage.teachersUsingICT / latestReport.usage.totalTeachers) * 100;
       const trainedTeachers = (latestReport.capacity.ictTrainedTeachers / latestReport.usage.totalTeachers) * 100;
@@ -327,12 +354,15 @@ const CompareSchools: React.FC<CompareSchoolsProps> = ({ schools, reports }) => 
           <div className="space-y-4">
             {/* Selected Schools */}
             <div className="flex flex-wrap gap-2">
-              {selectedSchoolsData.map(({ school }) => (
+              {selectedSchoolsData.map(({ school, latestReport }) => (
                 <div
                   key={school?.id}
                   className="inline-flex items-center px-3 py-1.5 rounded-full bg-blue-100 text-blue-800"
                 >
                   <span>{school?.name}</span>
+                  {!latestReport && (
+                    <AlertCircle className="h-3 w-3 ml-1 text-amber-500" title="No ICT reports available" />
+                  )}
                   <button
                     onClick={() => handleRemoveSchool(school?.id || '')}
                     className="ml-2 text-blue-600 hover:text-blue-800"
@@ -370,18 +400,31 @@ const CompareSchools: React.FC<CompareSchoolsProps> = ({ schools, reports }) => 
                     style={{ maxHeight: '300px', overflowY: 'auto' }}
                   >
                     {filteredSchools.length > 0 ? (
-                      filteredSchools.map((school) => (
-                        <div
-                          key={school.id}
-                          className="cursor-pointer hover:bg-gray-100 px-4 py-2"
-                          onClick={() => handleSchoolSelect(school.id)}
-                        >
-                          <div className="font-medium">{school.name}</div>
-                          <div className="text-sm text-gray-500">
-                            {school.district} • {school.environment} • {school.type}
+                      filteredSchools.map((school) => {
+                        const hasReport = getLatestReport(school.id, reports) !== undefined;
+                        return (
+                          <div
+                            key={school.id}
+                            className="cursor-pointer hover:bg-gray-100 px-4 py-2"
+                            onClick={() => handleSchoolSelect(school.id)}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <div className="font-medium">{school.name}</div>
+                                <div className="text-sm text-gray-500">
+                                  {school.district} • {school.environment} • {school.type}
+                                </div>
+                              </div>
+                              {!hasReport && (
+                                <div className="flex items-center text-amber-500">
+                                  <AlertCircle className="h-4 w-4 mr-1" />
+                                  <span className="text-xs">No reports</span>
+                                </div>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      ))
+                        );
+                      })
                     ) : (
                       <div className="px-4 py-2 text-sm text-gray-500">No schools found</div>
                     )}
@@ -497,7 +540,7 @@ const CompareSchools: React.FC<CompareSchoolsProps> = ({ schools, reports }) => 
                 </table>
               </div>
               
-              {/* KPI Legend */}
+              {/* KPI Legend - Updated to include No Data */}
               <div className="mt-4 flex items-center justify-center space-x-6 text-sm">
                 <div className="flex items-center">
                   <div className="w-3 h-3 rounded-full bg-green-500 mr-2"></div>
@@ -510,6 +553,10 @@ const CompareSchools: React.FC<CompareSchoolsProps> = ({ schools, reports }) => 
                 <div className="flex items-center">
                   <div className="w-3 h-3 rounded-full bg-red-500 mr-2"></div>
                   <span>Needs Improvement</span>
+                </div>
+                <div className="flex items-center">
+                  <div className="w-3 h-3 rounded-full bg-gray-400 mr-2"></div>
+                  <span>No Data Available</span>
                 </div>
               </div>
             </Card>
@@ -532,6 +579,7 @@ const CompareSchools: React.FC<CompareSchoolsProps> = ({ schools, reports }) => 
                           stroke={['#1976D2', '#FFB300', '#388E3C', '#E53935'][index]}
                           fill={['#1976D2', '#FFB300', '#388E3C', '#E53935'][index]}
                           fillOpacity={0.3}
+                          connectNulls={false}
                         />
                       ))}
                       <Legend />
@@ -575,7 +623,12 @@ const CompareSchools: React.FC<CompareSchoolsProps> = ({ schools, reports }) => 
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Metric</th>
                       {selectedSchoolsData.map((item) => (
                         <th key={item.school?.id} scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          {item.school?.name}
+                          <div className="flex items-center">
+                            {item.school?.name}
+                            {!item.latestReport && (
+                              <AlertCircle className="h-3 w-3 ml-1 text-amber-500" title="No ICT reports available" />
+                            )}
+                          </div>
                         </th>
                       ))}
                     </tr>
@@ -617,18 +670,22 @@ const CompareSchools: React.FC<CompareSchoolsProps> = ({ schools, reports }) => 
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Functional Devices</td>
                       {selectedSchoolsData.map((item) => (
                         <td key={item.school?.id} className="px-6 py-4 whitespace-nowrap text-sm">
-                          <div className="flex items-center">
-                            <span className="mr-2">{item.latestReport?.infrastructure.functionalDevices}</span>
-                            <div
-                              className="w-3 h-3 rounded-full"
-                              style={{ 
-                                backgroundColor: getKPIStatus(
-                                  item.latestReport?.infrastructure.functionalDevices || 0, 
-                                  { good: 30, fair: 15 }
-                                ).color 
-                              }}
-                            ></div>
-                          </div>
+                          {item.latestReport ? (
+                            <div className="flex items-center">
+                              <span className="mr-2">{item.latestReport.infrastructure.functionalDevices}</span>
+                              <div
+                                className="w-3 h-3 rounded-full"
+                                style={{ 
+                                  backgroundColor: getKPIStatus(
+                                    item.latestReport.infrastructure.functionalDevices, 
+                                    { good: 30, fair: 15 }
+                                  ).color 
+                                }}
+                              ></div>
+                            </div>
+                          ) : (
+                            <span className="text-gray-400 italic">No data</span>
+                          )}
                         </td>
                       ))}
                     </tr>
@@ -636,18 +693,22 @@ const CompareSchools: React.FC<CompareSchoolsProps> = ({ schools, reports }) => 
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Internet Connection</td>
                       {selectedSchoolsData.map((item) => (
                         <td key={item.school?.id} className="px-6 py-4 whitespace-nowrap text-sm">
-                          <div className="flex items-center">
-                            <span className="mr-2">{item.latestReport?.infrastructure.internetConnection}</span>
-                            <div
-                              className="w-3 h-3 rounded-full"
-                              style={{ 
-                                backgroundColor: getKPIStatus(
-                                  { 'None': 0, 'Slow': 25, 'Medium': 50, 'Fast': 100 }[item.latestReport?.infrastructure.internetConnection || 'None'] || 0,
-                                  { good: 75, fair: 40 }
-                                ).color 
-                              }}
-                            ></div>
-                          </div>
+                          {item.latestReport ? (
+                            <div className="flex items-center">
+                              <span className="mr-2">{item.latestReport.infrastructure.internetConnection}</span>
+                              <div
+                                className="w-3 h-3 rounded-full"
+                                style={{ 
+                                  backgroundColor: getKPIStatus(
+                                    { 'None': 0, 'Slow': 25, 'Medium': 50, 'Fast': 100 }[item.latestReport.infrastructure.internetConnection] || 0,
+                                    { good: 75, fair: 40 }
+                                  ).color 
+                                }}
+                              ></div>
+                            </div>
+                          ) : (
+                            <span className="text-gray-400 italic">No data</span>
+                          )}
                         </td>
                       ))}
                     </tr>
@@ -655,9 +716,13 @@ const CompareSchools: React.FC<CompareSchoolsProps> = ({ schools, reports }) => 
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Internet Speed</td>
                       {selectedSchoolsData.map((item) => (
                         <td key={item.school?.id} className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {item.latestReport?.infrastructure.internetConnection === 'None'
-                            ? 'N/A'
-                            : `${item.latestReport?.infrastructure.internetSpeedMbps} Mbps`}
+                          {item.latestReport ? (
+                            item.latestReport.infrastructure.internetConnection === 'None'
+                              ? 'N/A'
+                              : `${item.latestReport.infrastructure.internetSpeedMbps} Mbps`
+                          ) : (
+                            <span className="text-gray-400 italic">No data</span>
+                          )}
                         </td>
                       ))}
                     </tr>
@@ -665,15 +730,19 @@ const CompareSchools: React.FC<CompareSchoolsProps> = ({ schools, reports }) => 
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Power Backup</td>
                       {selectedSchoolsData.map((item) => (
                         <td key={item.school?.id} className="px-6 py-4 whitespace-nowrap text-sm">
-                          <div className="flex items-center">
-                            <span className="mr-2">{item.latestReport?.infrastructure.powerBackup ? 'Yes' : 'No'}</span>
-                            <div
-                              className="w-3 h-3 rounded-full"
-                              style={{ 
-                                backgroundColor: item.latestReport?.infrastructure.powerBackup ? '#22C55E' : '#EF4444'
-                              }}
-                            ></div>
-                          </div>
+                          {item.latestReport ? (
+                            <div className="flex items-center">
+                              <span className="mr-2">{item.latestReport.infrastructure.powerBackup ? 'Yes' : 'No'}</span>
+                              <div
+                                className="w-3 h-3 rounded-full"
+                                style={{ 
+                                  backgroundColor: item.latestReport.infrastructure.powerBackup ? '#22C55E' : '#EF4444'
+                                }}
+                              ></div>
+                            </div>
+                          ) : (
+                            <span className="text-gray-400 italic">No data</span>
+                          )}
                         </td>
                       ))}
                     </tr>
@@ -681,22 +750,26 @@ const CompareSchools: React.FC<CompareSchoolsProps> = ({ schools, reports }) => 
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Teachers Using ICT</td>
                       {selectedSchoolsData.map((item) => (
                         <td key={item.school?.id} className="px-6 py-4 whitespace-nowrap text-sm">
-                          <div className="flex items-center">
-                            <span className="mr-2">
-                              {item.latestReport?.usage.teachersUsingICT} of {item.latestReport?.usage.totalTeachers}
-                              {' '}
-                              ({Math.round((item.latestReport?.usage.teachersUsingICT || 0) / (item.latestReport?.usage.totalTeachers || 1) * 100)}%)
-                            </span>
-                            <div
-                              className="w-3 h-3 rounded-full"
-                              style={{ 
-                                backgroundColor: getKPIStatus(
-                                  (item.latestReport?.usage.teachersUsingICT || 0) / (item.latestReport?.usage.totalTeachers || 1) * 100,
-                                  { good: 70, fair: 40 }
-                                ).color 
-                              }}
-                            ></div>
-                          </div>
+                          {item.latestReport ? (
+                            <div className="flex items-center">
+                              <span className="mr-2">
+                                {item.latestReport.usage.teachersUsingICT} of {item.latestReport.usage.totalTeachers}
+                                {' '}
+                                ({Math.round((item.latestReport.usage.teachersUsingICT / item.latestReport.usage.totalTeachers) * 100)}%)
+                              </span>
+                              <div
+                                className="w-3 h-3 rounded-full"
+                                style={{ 
+                                  backgroundColor: getKPIStatus(
+                                    (item.latestReport.usage.teachersUsingICT / item.latestReport.usage.totalTeachers) * 100,
+                                    { good: 70, fair: 40 }
+                                  ).color 
+                                }}
+                              ></div>
+                            </div>
+                          ) : (
+                            <span className="text-gray-400 italic">No data</span>
+                          )}
                         </td>
                       ))}
                     </tr>
@@ -704,18 +777,22 @@ const CompareSchools: React.FC<CompareSchoolsProps> = ({ schools, reports }) => 
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Student Digital Literacy</td>
                       {selectedSchoolsData.map((item) => (
                         <td key={item.school?.id} className="px-6 py-4 whitespace-nowrap text-sm">
-                          <div className="flex items-center">
-                            <span className="mr-2">{item.latestReport?.usage.studentDigitalLiteracyRate}%</span>
-                            <div
-                              className="w-3 h-3 rounded-full"
-                              style={{ 
-                                backgroundColor: getKPIStatus(
-                                  item.latestReport?.usage.studentDigitalLiteracyRate || 0,
-                                  { good: 70, fair: 40 }
-                                ).color 
-                              }}
-                            ></div>
-                          </div>
+                          {item.latestReport ? (
+                            <div className="flex items-center">
+                              <span className="mr-2">{item.latestReport.usage.studentDigitalLiteracyRate}%</span>
+                              <div
+                                className="w-3 h-3 rounded-full"
+                                style={{ 
+                                  backgroundColor: getKPIStatus(
+                                    item.latestReport.usage.studentDigitalLiteracyRate,
+                                    { good: 70, fair: 40 }
+                                  ).color 
+                                }}
+                              ></div>
+                            </div>
+                          ) : (
+                            <span className="text-gray-400 italic">No data</span>
+                          )}
                         </td>
                       ))}
                     </tr>
@@ -723,22 +800,26 @@ const CompareSchools: React.FC<CompareSchoolsProps> = ({ schools, reports }) => 
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">ICT-Trained Teachers</td>
                       {selectedSchoolsData.map((item) => (
                         <td key={item.school?.id} className="px-6 py-4 whitespace-nowrap text-sm">
-                          <div className="flex items-center">
-                            <span className="mr-2">
-                              {item.latestReport?.capacity.ictTrainedTeachers} of {item.latestReport?.usage.totalTeachers}
-                              {' '}
-                              ({Math.round((item.latestReport?.capacity.ictTrainedTeachers || 0) / (item.latestReport?.usage.totalTeachers || 1) * 100)}%)
-                            </span>
-                            <div
-                              className="w-3 h-3 rounded-full"
-                              style={{ 
-                                backgroundColor: getKPIStatus(
-                                  (item.latestReport?.capacity.ictTrainedTeachers || 0) / (item.latestReport?.usage.totalTeachers || 1) * 100,
-                                  { good: 70, fair: 40 }
-                                ).color 
-                              }}
-                            ></div>
-                          </div>
+                          {item.latestReport ? (
+                            <div className="flex items-center">
+                              <span className="mr-2">
+                                {item.latestReport.capacity.ictTrainedTeachers} of {item.latestReport.usage.totalTeachers}
+                                {' '}
+                                ({Math.round((item.latestReport.capacity.ictTrainedTeachers / item.latestReport.usage.totalTeachers) * 100)}%)
+                              </span>
+                              <div
+                                className="w-3 h-3 rounded-full"
+                                style={{ 
+                                  backgroundColor: getKPIStatus(
+                                    (item.latestReport.capacity.ictTrainedTeachers / item.latestReport.usage.totalTeachers) * 100,
+                                    { good: 70, fair: 40 }
+                                  ).color 
+                                }}
+                              ></div>
+                            </div>
+                          ) : (
+                            <span className="text-gray-400 italic">No data</span>
+                          )}
                         </td>
                       ))}
                     </tr>
@@ -746,7 +827,9 @@ const CompareSchools: React.FC<CompareSchoolsProps> = ({ schools, reports }) => 
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Support Staff</td>
                       {selectedSchoolsData.map((item) => (
                         <td key={item.school?.id} className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {item.latestReport?.capacity.supportStaff}
+                          {item.latestReport ? item.latestReport.capacity.supportStaff : (
+                            <span className="text-gray-400 italic">No data</span>
+                          )}
                         </td>
                       ))}
                     </tr>
@@ -762,6 +845,7 @@ const CompareSchools: React.FC<CompareSchoolsProps> = ({ schools, reports }) => 
             <Monitor className="h-12 w-12 mx-auto text-gray-300 mb-4" />
             <p className="text-gray-500">Search and select schools to compare using the search box above.</p>
             <p className="text-sm text-gray-400 mt-2">You can compare up to 4 schools at once and filter by specific metrics.</p>
+            <p className="text-sm text-gray-400 mt-1">Schools without ICT reports will show basic information only.</p>
           </div>
         )}
       </div>
